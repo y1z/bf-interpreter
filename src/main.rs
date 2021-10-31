@@ -67,6 +67,7 @@ pub fn interpret(bf_code: String, show_cells_after_ops: bool) {
       let are_the_same = None != command.0.matches(character).next();
 
       let mut std_in = std::io::stdin();
+      let mut std_out = std::io::stdout();
       if are_the_same {
         match command.1 {
           BF_OPS::MOVE_POINTER_LEFT => pointer = (pointer.wrapping_sub(1)) % max_index,
@@ -85,15 +86,15 @@ pub fn interpret(bf_code: String, show_cells_after_ops: bool) {
           BF_OPS::PRINT_CHAR => unsafe {
             let mut a = [0];
             a[0] = memory_cells[pointer];
-            std::io::stdout().write_all(&a);
+            let mut handle = std_out.lock();
+            handle.write(&a);
+            // handle.write(b"\n");
           },
           BF_OPS::INPUT_CHAR => {
             let mut final_input = String::new();
-            //let mut handle = std_in.lock();
-            //handle.read_line(&mut final_input);
-            std::io::stdin().read_line(&mut final_input);
+            let mut handle = std_in.lock();
+            handle.read_line(&mut final_input);
             memory_cells[pointer] = final_input.as_bytes()[0];
-            //print!("{}", final_input);
           }
           BF_OPS::JUMP_PAST_RIGHT_BRACE => {}
           BF_OPS::JUMP_BACK_TO_LEFT_BRACE => {}
