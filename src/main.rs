@@ -1,9 +1,10 @@
+mod program_data;
+
+use crate::program_data::*;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
-use std::rc::Rc;
-const STARTING_CELLS: usize = 30_000usize;
 
 #[allow(non_camel_case_types)]
 pub enum BF_OPS {
@@ -59,56 +60,79 @@ pub fn load_file(file_name: &String) -> Option<String> {
 }
 
 pub fn interpret(bf_code: String, show_cells_after_ops: bool) {
-  let mut memory_cells: Vec<u8> = vec![0; STARTING_CELLS];
-  let max_index = memory_cells.len() - 1;
-  let mut pointer = 0usize;
-  for (index, character) in bf_code.char_indices() {
-    for command in COMMANDS.iter() {
-      let are_the_same = None != command.0.matches(character).next();
+  let mut program = program_data::ProgramData::new();
+  let max_index = program.memory_cells.len() - 1;
 
-      let mut std_in = std::io::stdin();
-      let mut std_out = std::io::stdout();
+  let mut code_index = 0usize;
+  let bf_code_length = bf_code.len();
+
+  let bf_code_final: Vec<(usize, char)> = bf_code.char_indices().collect();
+  loop {
+    let keep_parsing = code_index < bf_code_length;
+    if !keep_parsing {
+      break;
+    }
+    for command in COMMANDS.iter() {
+      let index_character = bf_code_final[code_index];
+      let are_the_same = None != command.0.matches(index_character.1).next();
+
       if are_the_same {
+        let std_in = std::io::stdin();
+        let std_out = std::io::stdout();
         match command.1 {
-          BF_OPS::MOVE_POINTER_LEFT => pointer = (pointer.wrapping_sub(1)) % max_index,
-          BF_OPS::MOVE_POINTER_RIGHT => pointer = (pointer.wrapping_add(1)) % max_index,
+          BF_OPS::MOVE_POINTER_LEFT => {
+            program.pointer = (program.pointer.wrapping_sub(1)) % max_index
+          }
+          BF_OPS::MOVE_POINTER_RIGHT => {
+            program.pointer = (program.pointer.wrapping_add(1)) % max_index
+          }
           BF_OPS::DECREMENT_CELL_VAL => {
-            let mut temp = memory_cells[pointer];
+            let mut temp = program.memory_cells[program.pointer];
             temp = temp.wrapping_sub(1);
-            memory_cells[pointer] = temp;
+            program.memory_cells[program.pointer] = temp;
           }
           BF_OPS::INCREMENT_CELL_VAL => {
-            let mut temp = memory_cells[pointer];
+            let mut temp = program.memory_cells[program.pointer];
             temp = temp.wrapping_add(1);
-            memory_cells[pointer] = temp;
+            program.memory_cells[program.pointer] = temp;
           }
 
-          BF_OPS::PRINT_CHAR => unsafe {
+          BF_OPS::PRINT_CHAR => {
             let mut a = [0];
-            a[0] = memory_cells[pointer];
+            a[0] = program.memory_cells[program.pointer];
             let mut handle = std_out.lock();
-            handle.write(&a);
-            // handle.write(b"\n");
-          },
+            let res = handle.write(&a);
+            if let Err(error) = res {
+              panic!("\n\n\nError : [{}]", error);
+            }
+          }
           BF_OPS::INPUT_CHAR => {
             let mut final_input = String::new();
             let mut handle = std_in.lock();
-            handle.read_line(&mut final_input);
-            memory_cells[pointer] = final_input.as_bytes()[0];
+            let res = handle.read_line(&mut final_input);
+            if let Err(error) = res {
+              panic!("\n\n\nError : [{}]", error);
+            }
+
+            program.memory_cells[program.pointer] = final_input.as_bytes()[0];
           }
           BF_OPS::JUMP_PAST_RIGHT_BRACE => {}
           BF_OPS::JUMP_BACK_TO_LEFT_BRACE => {}
         }
       }
     }
+
+    code_index += 1;
   }
+
+  //for (index, character) in bf_code.char_indices() {}
   println!("\n");
 
   if show_cells_after_ops {
-    let mut last_value: u8 = memory_cells.first().unwrap_or(&0).clone();
+    let mut last_value: u8 = program.memory_cells.first().unwrap_or(&0).clone();
     let mut repeated_value_count = 0usize;
 
-    for cell in memory_cells {
+    for cell in program.memory_cells {
       if last_value == cell {
         repeated_value_count += 1;
       } else {
@@ -128,9 +152,9 @@ pub fn interpret(bf_code: String, show_cells_after_ops: bool) {
 
 fn display_bf_cell_data(repeated_value_count: usize, last_value: u8) {
   match repeated_value_count {
-    0 | 1 => print!("| {}", last_value),
+    0 | 1 => print!("| {} ", last_value),
     _ => println!(
-      "\nrepeated [x{}] value {} ",
+      "\n value repeated [{} times] value = {} ",
       repeated_value_count, last_value
     ),
   }
