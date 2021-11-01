@@ -1,4 +1,5 @@
 use crate::program_data;
+use std::io::prelude::*;
 
 #[allow(non_camel_case_types)]
 pub enum BF_OPS {
@@ -80,8 +81,22 @@ pub fn interpret(bf_code: String, show_cells_after_ops: bool) {
 
             program.memory_cells[program.pointer] = final_input.as_bytes()[0];
           }
-          BF_OPS::JUMP_PAST_RIGHT_BRACE => {}
-          BF_OPS::JUMP_BACK_TO_LEFT_BRACE => {}
+          BF_OPS::JUMP_PAST_RIGHT_BRACE => {
+            if 0 == program.memory_cells[program.pointer] {
+              let new_index = find_matching_brace(&bf_code_final, code_index);
+              if let Some(new_index_value) = new_index {
+                code_index = new_index_value + 1;
+              }
+            }
+          }
+          BF_OPS::JUMP_BACK_TO_LEFT_BRACE => {
+            if 0 != program.memory_cells[program.pointer] {
+              let new_index = find_matching_brace(&bf_code_final, code_index);
+              if let Some(new_index_value) = new_index {
+                code_index = new_index_value;
+              }
+            }
+          }
         }
       }
     }
@@ -122,4 +137,49 @@ fn display_bf_cell_data(repeated_value_count: usize, last_value: u8) {
       repeated_value_count, last_value
     ),
   }
+}
+
+fn find_matching_brace(code: &Vec<(usize, char)>, current_index: usize) -> Option<usize> {
+  let matching_brace = code[current_index].1;
+  let advance_forward = if '[' == matching_brace { true } else { false };
+
+  let oppsite_brace = if advance_forward { ']' } else { '[' };
+
+  let mut level = 1;
+  let mut index = current_index;
+
+  if advance_forward {
+    index = index + 1;
+  } else {
+    index = index - 1;
+  }
+
+  let mut keep_parsing = true;
+  while keep_parsing {
+    let cant_go_back_further = index == 0 && !advance_forward;
+
+    if cant_go_back_further {
+      return None;
+    }
+
+    let current_char = code[index].1;
+
+    if oppsite_brace == current_char {
+      level = level - 1;
+    } else if matching_brace == current_char {
+      level = level + 1;
+    }
+
+    if level > 0 {
+      if advance_forward {
+        index = index + 1;
+      } else {
+        index = index - 1;
+      }
+    } else {
+      keep_parsing = false;
+    }
+  }
+
+  Some(index)
 }
