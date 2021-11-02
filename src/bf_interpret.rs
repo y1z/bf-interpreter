@@ -31,12 +31,16 @@ pub fn interpret(bf_code: String, show_cells_after_ops: bool) {
   let mut code_index = 0usize;
   let bf_code_length = bf_code.len();
 
+  let mut path_taken = String::with_capacity(40_000usize);
+
   let bf_code_final: Vec<(usize, char)> = bf_code.char_indices().collect();
   loop {
     let keep_parsing = code_index < bf_code_length;
     if !keep_parsing {
       break;
     }
+    let mut dont_advance_past_left_brace = false;
+
     for command in COMMANDS.iter() {
       let index_character = bf_code_final[code_index];
       let are_the_same = None != command.0.matches(index_character.1).next();
@@ -46,20 +50,24 @@ pub fn interpret(bf_code: String, show_cells_after_ops: bool) {
         let std_out = std::io::stdout();
         match command.1 {
           BF_OPS::MOVE_POINTER_LEFT => {
-            program.pointer = (program.pointer.wrapping_sub(1)) % max_index
+            program.pointer = (program.pointer.wrapping_sub(1)) % max_index;
+            break;
           }
           BF_OPS::MOVE_POINTER_RIGHT => {
-            program.pointer = (program.pointer.wrapping_add(1)) % max_index
+            program.pointer = (program.pointer.wrapping_add(1)) % max_index;
+            break;
           }
           BF_OPS::DECREMENT_CELL_VAL => {
             let mut temp = program.memory_cells[program.pointer];
             temp = temp.wrapping_sub(1);
             program.memory_cells[program.pointer] = temp;
+            break;
           }
           BF_OPS::INCREMENT_CELL_VAL => {
             let mut temp = program.memory_cells[program.pointer];
             temp = temp.wrapping_add(1);
             program.memory_cells[program.pointer] = temp;
+            break;
           }
 
           BF_OPS::PRINT_CHAR => {
@@ -70,6 +78,7 @@ pub fn interpret(bf_code: String, show_cells_after_ops: bool) {
             if let Err(error) = res {
               panic!("\n\n\nError : [{}]", error);
             }
+            break;
           }
           BF_OPS::INPUT_CHAR => {
             let mut final_input = String::new();
@@ -80,32 +89,41 @@ pub fn interpret(bf_code: String, show_cells_after_ops: bool) {
             }
 
             program.memory_cells[program.pointer] = final_input.as_bytes()[0];
+            break;
           }
           BF_OPS::JUMP_PAST_RIGHT_BRACE => {
             if 0 == program.memory_cells[program.pointer] {
               let new_index = find_matching_brace(&bf_code_final, code_index);
               if let Some(new_index_value) = new_index {
-                code_index = new_index_value + 1;
+                code_index = new_index_value;
               }
             }
+            break;
           }
           BF_OPS::JUMP_BACK_TO_LEFT_BRACE => {
             if 0 != program.memory_cells[program.pointer] {
               let new_index = find_matching_brace(&bf_code_final, code_index);
               if let Some(new_index_value) = new_index {
                 code_index = new_index_value;
+                dont_advance_past_left_brace = true;
               }
             }
+            break;
           }
         }
       }
     }
 
-    code_index += 1;
+    if !dont_advance_past_left_brace {
+      //path_taken.push(bf_code_final[code_index].1);
+      //eprint!("{}", );
+      code_index += 1;
+    }
   }
 
   //for (index, character) in bf_code.char_indices() {}
-  println!("\n");
+  println!("\n\n");
+  //eprint!("\n path taken by program \n{}\n", path_taken);
 
   if show_cells_after_ops {
     let mut last_value: u8 = program.memory_cells.first().unwrap_or(&0).clone();
@@ -163,6 +181,7 @@ fn find_matching_brace(code: &Vec<(usize, char)>, current_index: usize) -> Optio
     }
 
     let current_char = code[index].1;
+    //eprint!("{}", current_char);
 
     if oppsite_brace == current_char {
       level = level - 1;
