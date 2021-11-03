@@ -28,21 +28,20 @@ pub fn interpret(bf_code: String, show_cells_after_ops: bool) {
   let mut program = program_data::ProgramData::new();
   let max_index = program.memory_cells.len() - 1;
 
-  let mut code_index = 0usize;
+  program.code_index = 0usize;
   let bf_code_length = bf_code.len();
-
-  let mut path_taken = String::with_capacity(40_000usize);
-
   let bf_code_final: Vec<(usize, char)> = bf_code.char_indices().collect();
+
+  std::io::stdout().write(b"output : ");
   loop {
-    let keep_parsing = code_index < bf_code_length;
+    let keep_parsing = program.code_index < bf_code_length;
     if !keep_parsing {
       break;
     }
     let mut dont_advance_past_left_brace = false;
 
     for command in COMMANDS.iter() {
-      let index_character = bf_code_final[code_index];
+      let index_character = bf_code_final[program.code_index];
       let are_the_same = None != command.0.matches(index_character.1).next();
 
       if are_the_same {
@@ -74,7 +73,8 @@ pub fn interpret(bf_code: String, show_cells_after_ops: bool) {
             let mut a = [0];
             a[0] = program.memory_cells[program.pointer];
             let mut handle = std_out.lock();
-            let res = handle.write(&a);
+            let temp = [a[0] as u8];
+            let res = handle.write(&temp);
             if let Err(error) = res {
               panic!("\n\n\nError : [{}]", error);
             }
@@ -93,18 +93,18 @@ pub fn interpret(bf_code: String, show_cells_after_ops: bool) {
           }
           BF_OPS::JUMP_PAST_RIGHT_BRACE => {
             if 0 == program.memory_cells[program.pointer] {
-              let new_index = find_matching_brace(&bf_code_final, code_index);
+              let new_index = find_matching_brace(&bf_code_final, program.code_index);
               if let Some(new_index_value) = new_index {
-                code_index = new_index_value;
+                program.code_index = new_index_value;
               }
             }
             break;
           }
           BF_OPS::JUMP_BACK_TO_LEFT_BRACE => {
             if 0 != program.memory_cells[program.pointer] {
-              let new_index = find_matching_brace(&bf_code_final, code_index);
+              let new_index = find_matching_brace(&bf_code_final, program.code_index);
               if let Some(new_index_value) = new_index {
-                code_index = new_index_value;
+                program.code_index = new_index_value;
                 dont_advance_past_left_brace = true;
               }
             }
@@ -115,15 +115,11 @@ pub fn interpret(bf_code: String, show_cells_after_ops: bool) {
     }
 
     if !dont_advance_past_left_brace {
-      //path_taken.push(bf_code_final[code_index].1);
-      //eprint!("{}", );
-      code_index += 1;
+      program.code_index += 1;
     }
   }
 
-  //for (index, character) in bf_code.char_indices() {}
-  println!("\n\n");
-  //eprint!("\n path taken by program \n{}\n", path_taken);
+  println!("");
 
   if show_cells_after_ops {
     let mut last_value: u8 = program.memory_cells.first().unwrap_or(&0).clone();
